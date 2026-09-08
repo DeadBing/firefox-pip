@@ -656,7 +656,7 @@ new file mode 100644
 diff --git a/test/BUILD.gn b/test/BUILD.gn
 --- a/test/BUILD.gn
 +++ b/test/BUILD.gn
-@@ -329,6 +329,21 @@
+@@ -329,6 +329,22 @@
      "//brave/components/brave_stats/browser",
    ]
  
@@ -665,9 +665,10 @@ diff --git a/test/BUILD.gn b/test/BUILD.gn
 +    deps += [
 +      "//base/test:test_support",
 +      "//chrome/browser/ui/views:layout_provider",
-+      "//chrome/test:test_support_ui",
++      "//chrome/test/views",
 +      "//components/global_media_controls",
 +      "//components/soda:test_support",
++      "//media",
 +      "//services/media_session/public/cpp",
 +      "//ui/display:test_support",
 +      "//ui/events",
