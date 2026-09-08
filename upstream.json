@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/brave/brave-core.git",
+  "commit": "fe5172e875d45f2dee1ef73c289d8e43ec5b8ea8",
+  "brave_version": "1.97.16",
+  "chromium_version": "153.0.8010.28",
+  "node_min": "24.16.0",
+  "node_major": 24,
+  "pnpm_version": "11.19.0"
+}

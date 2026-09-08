@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<title>Проверка PiP</title>
+<style>
+  body { margin: 40px auto; padding: 0 20px; max-width: 900px; background: #17181c; color: #f4f4f5; font: 17px/1.5 system-ui; }
+  video { display: block; width: 100%; max-height: 65vh; background: black; margin: 24px 0; }
+  button, input { font: inherit; margin: 6px 12px 6px 0; }
+  button { padding: 8px 16px; cursor: pointer; }
+  output { display: block; color: #c0c4d1; white-space: pre-wrap; }
+</style>
+<h1>Проверка встроенного PiP</h1>
+<p>Выберите локальный ролик. Файл остаётся на этом компьютере.</p>
+<input id="file" type="file" accept="video/*" aria-label="Выбрать видео">
+<button id="pip">Открыть PiP</button>
+<video id="video" controls></video>
+<output id="status" role="status">Видео не выбрано.</output>
+<p>В окне PiP: Space / K — воспроизведение, ← / → — 10 секунд,
+M — звук, Home / End — начало/конец, F — развернуть, Esc — вернуть размер.</p>
+<script>
+  const video = document.querySelector('#video');
+  const status = document.querySelector('#status');
+  let objectURL;
+  document.querySelector('#file').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (objectURL) URL.revokeObjectURL(objectURL);
+    objectURL = URL.createObjectURL(file);
+    video.src = objectURL;
+    status.textContent = file.name;
+  });
+  document.querySelector('#pip').addEventListener('click', async () => {
+    try {
+      if (!video.src) throw new Error('Сначала выберите видео.');
+      await video.requestPictureInPicture();
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+  video.addEventListener('enterpictureinpicture', () => { status.textContent = 'PiP открыт.'; });
+  video.addEventListener('leavepictureinpicture', () => { status.textContent = 'Видео вернулось во вкладку.'; });
+  video.addEventListener('error', () => { status.textContent = 'Не удалось воспроизвести файл: попробуйте другой поддерживаемый формат.'; });
+</script>
+</html>
