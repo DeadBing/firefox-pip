@@ -52,7 +52,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  
  BraveVideoOverlayWindowViews::~BraveVideoOverlayWindowViews() = default;
  
-@@ -84,6 +96,12 @@
+@@ -84,6 +96,13 @@
  
  void BraveVideoOverlayWindowViews::SetUpViews() {
    VideoOverlayWindowViews::SetUpViews();
@@ -60,12 +60,13 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +      std::make_unique<SimpleOverlayWindowImageButton>(
 +          base::BindRepeating(&BraveVideoOverlayWindowViews::ToggleExpanded,
 +                              base::Unretained(this)),
-+          kFullscreenIcon, l10n_util::GetStringUTF16(IDS_ACCNAME_MAXIMIZE)));
-+  expand_button_->set_icon_size(20);
++          kLeoFullscreenOnIcon,
++          l10n_util::GetStringUTF16(IDS_ACCNAME_MAXIMIZE)));
++  expand_button_->set_icon_size(20 + kPipWindowIconPadding * 2);
    UpdateControlIcons();
  }
  
-@@ -92,6 +110,7 @@
+@@ -92,6 +111,7 @@
  
    LayoutTopControls();
    LayoutCenterControls();
@@ -73,7 +74,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  }
  
  void BraveVideoOverlayWindowViews::UpdateControlIcons() {
-@@ -113,106 +132,237 @@
+@@ -113,106 +133,239 @@
  }
  
  void BraveVideoOverlayWindowViews::LayoutTopControls() {
@@ -207,7 +208,9 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +  for (auto* button : visible_controls) {
 +    if (auto* simple =
 +            views::AsViewClass<SimpleOverlayWindowImageButton>(button)) {
-+      simple->set_icon_size(std::min(32, size - kPipWindowIconPadding * 2));
++      // Brave's size override replaces the width before icon padding is
++      // removed.
++      simple->set_icon_size(std::min(32 + kPipWindowIconPadding * 2, size));
 +    }
 +    button->SetBounds(x, y, size, size);
 +    x += size + gap;

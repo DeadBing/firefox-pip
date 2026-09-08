@@ -141,7 +141,15 @@ class Project:
             raise BuildError(f"Unexpected brave-core revision {actual}; expected {UPSTREAM['commit']}. No files changed.")
 
     def environment(self):
+        if not self.pnpm:
+            raise BuildError("Install pnpm and reopen the terminal before building.")
         env = os.environ.copy()
+        # Brave consumes --ninja=j but only applies it with remote execution.
+        # Set Siso's local limit directly so --jobs also works offline.
+        limits = [item.strip() for item in env.get("SISO_LIMITS", "").split(",")
+                  if item.strip() and item.partition("=")[0].strip() != "local"]
+        limits.append(f"local={self.jobs}")
+        env["SISO_LIMITS"] = ",".join(limits)
         # Keep the repair local to this command and its nested pnpm installs.
         shim_dir = self.root / "pnpm-shim"
         shim_dir.mkdir(parents=True, exist_ok=True)
@@ -230,7 +238,7 @@ class Project:
             f"--target_os={self.target_os}", f"--target_arch={self.arch}",
             "--channel=nightly", "--use_remoteexec=false", "--skip_signing",
             "--gn=symbol_level:0", "--gn=enable_updater:false",
-            "--gn=enable_update_notifications:false", f"--ninja=j:{self.jobs}",
+            "--gn=enable_update_notifications:false",
         ]
         if package:
             args.append("--target=create_dist")
