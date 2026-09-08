@@ -107,6 +107,10 @@ class Project:
         if self.target_os == "mac":
             print(capture(["xcodebuild", "-version"]))
             print("macOS SDK:", capture(["xcrun", "--show-sdk-version"]))
+            try:
+                print(capture(["xcrun", "metal", "--version"]))
+            except BuildError as error:
+                raise BuildError("Metal Toolchain is unavailable. Run xcodebuild -downloadComponent MetalToolchain, then retry doctor.") from error
         else:
             developer_mode = capture([
                 "reg.exe", "query",

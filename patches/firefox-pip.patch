@@ -1,7 +1,7 @@
 diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/browser/ui/views/overlay/brave_video_overlay_window_views.cc
 --- a/browser/ui/views/overlay/brave_video_overlay_window_views.cc
 +++ b/browser/ui/views/overlay/brave_video_overlay_window_views.cc
-@@ -5,24 +5,34 @@
+@@ -5,24 +5,37 @@
  
  #include "brave/browser/ui/views/overlay/brave_video_overlay_window_views.h"
  
@@ -32,14 +32,17 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  #include "chrome/browser/ui/views/overlay/toggle_microphone_button.h"
 -#include "ui/gfx/canvas.h"
 +#include "chrome/browser/ui/views/overlay/toggle_mute_button.h"
++#include "chrome/grit/generated_resources.h"
++#include "ui/base/l10n/l10n_util.h"
 +#include "ui/events/event.h"
 +#include "ui/events/keycodes/keyboard_codes.h"
++#include "ui/views/accessibility/view_accessibility.h"
 +#include "ui/views/controls/label.h"
 +#include "ui/views/focus/focus_manager.h"
  #include "ui/views/view_utils.h"
  
  #if BUILDFLAG(IS_LINUX)
-@@ -43,8 +53,7 @@
+@@ -43,8 +56,7 @@
  
  BraveVideoOverlayWindowViews::BraveVideoOverlayWindowViews(
      content::VideoPictureInPictureWindowController* controller)
@@ -49,25 +52,20 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  
  BraveVideoOverlayWindowViews::~BraveVideoOverlayWindowViews() = default;
  
-@@ -84,6 +93,17 @@
+@@ -84,6 +96,12 @@
  
  void BraveVideoOverlayWindowViews::SetUpViews() {
    VideoOverlayWindowViews::SetUpViews();
-+  if (!toggle_mute_button_) {
-+    // The view owns the callback and cannot outlive this window.
-+    toggle_mute_button_ = playback_controls_container_view_->AddChildView(
-+        std::make_unique<ToggleMuteButton>(base::BindRepeating(
-+            [](BraveVideoOverlayWindowViews* window) {
-+              window->controller_->RequestMute(
-+                  !window->controller_->GetMuteStatus());
-+            },
-+            base::Unretained(this))));
-+    toggle_mute_button_->SetMutedState(controller_->GetMuteStatus());
-+  }
++  expand_button_ = playback_controls_container_view_->AddChildView(
++      std::make_unique<SimpleOverlayWindowImageButton>(
++          base::BindRepeating(&BraveVideoOverlayWindowViews::ToggleExpanded,
++                              base::Unretained(this)),
++          kFullscreenIcon, l10n_util::GetStringUTF16(IDS_ACCNAME_MAXIMIZE)));
++  expand_button_->set_icon_size(20);
    UpdateControlIcons();
  }
  
-@@ -92,6 +112,7 @@
+@@ -92,6 +110,7 @@
  
    LayoutTopControls();
    LayoutCenterControls();
@@ -75,7 +73,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  }
  
  void BraveVideoOverlayWindowViews::UpdateControlIcons() {
-@@ -113,106 +134,204 @@
+@@ -113,106 +132,237 @@
  }
  
  void BraveVideoOverlayWindowViews::LayoutTopControls() {
@@ -175,6 +173,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 -    visible_controls[i]->SetBounds(x, y, kCenterControlSize,
 -                                   kCenterControlSize);
 -    x += kCenterControlSize + kCenterControlSpacing;
+-  }
 +  const bool showing_vc = vc_controls_container_view_->GetVisible();
 +  auto add_visible =
 +      [&](std::initializer_list<OverlayWindowImageButton*> buttons) {
@@ -230,14 +229,20 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +  replay_10_seconds_button_->SetEnabled(CanSeek());
 +  forward_10_seconds_button_->SetEnabled(CanSeek());
 +
-+  toggle_mute_button_->SetBounds(kMargin, row_y, kButtonSize, kButtonSize);
-+  const int caption_x = size.width() - kMargin - kButtonSize;
++  if (toggle_mute_button_) {
++    toggle_mute_button_->SetBounds(kMargin, row_y, kButtonSize, kButtonSize);
++  }
++  const int expand_x = size.width() - kMargin - kButtonSize;
++  if (expand_button_) {
++    expand_button_->SetBounds(expand_x, row_y, kButtonSize, kButtonSize);
++  }
++  const int caption_x = expand_x - kButtonSize - 8;
 +  live_caption_button_->SetBounds(caption_x, row_y, kButtonSize, kButtonSize);
 +  live_caption_dialog_->SetPosition(
 +      {std::max(0, caption_x + kButtonSize - live_caption_dialog_->width()),
 +       row_y - live_caption_dialog_->height()});
 +
-+  const int timestamp_x = kMargin + kButtonSize + 8;
++  const int timestamp_x = kMargin + (toggle_mute_button_ ? kButtonSize + 8 : 0);
 +  const int timestamp_width = std::max(0, caption_x - 8 - timestamp_x);
 +  timestamp_->SetBounds(timestamp_x, row_y + 8, timestamp_width, 16);
 +  live_status_->SetBounds(
@@ -257,11 +262,27 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +    gfx::Rect restored = *bounds_before_expanding_;
 +    bounds_before_expanding_.reset();
 +    restored.AdjustToFit(work_area);
++    SetAspectRatio(gfx::SizeF(natural_size_));
 +    SetBounds(restored);
 +  } else {
 +    bounds_before_expanding_ = GetWindowBoundsInScreen();
++    SetAspectRatio(gfx::SizeF(work_area.size()));
 +    SetBounds(work_area);
-   }
++  }
++  const auto label = l10n_util::GetStringUTF16(
++      bounds_before_expanding_ ? IDS_ACCNAME_RESTORE : IDS_ACCNAME_MAXIMIZE);
++  expand_button_->SetTooltipText(label);
++  expand_button_->GetViewAccessibility().SetName(label);
++}
++
++bool BraveVideoOverlayWindowViews::ControlsHitTestContainsPoint(
++    const gfx::Point& point) {
++  if (!overlay_view_ && AreControlsVisible() && expand_button_ &&
++      expand_button_->IsDrawn() &&
++      expand_button_->GetMirroredBounds().Contains(point)) {
++    return true;
++  }
++  return VideoOverlayWindowViews::ControlsHitTestContainsPoint(point);
  }
  
  void BraveVideoOverlayWindowViews::OnKeyEvent(ui::KeyEvent* event) {
@@ -294,7 +315,8 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +        }
 +        break;
 +      case ui::VKEY_M:
-+        if (!event->is_repeat()) {
++        handled = toggle_mute_button_ != nullptr;
++        if (handled && !event->is_repeat()) {
 +          controller_->RequestMute(!controller_->GetMuteStatus());
 +        }
 +        break;
@@ -357,6 +379,16 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +  LayoutBottomControls();
 +}
 +
++void BraveVideoOverlayWindowViews::UpdateNaturalSize(
++    const gfx::Size& natural_size) {
++  VideoOverlayWindowViews::UpdateNaturalSize(natural_size);
++  if (bounds_before_expanding_) {
++    const auto work_area = GetWorkAreaForWindow();
++    SetAspectRatio(gfx::SizeF(work_area.size()));
++    SetBounds(work_area);
++  }
++}
++
 +gfx::Size BraveVideoOverlayWindowViews::GetMinimumSize() const {
 +  auto size = VideoOverlayWindowViews::GetMinimumSize();
 +  size.SetToMax({320, 180});
@@ -365,7 +397,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.h b/browser/ui/views/overlay/brave_video_overlay_window_views.h
 --- a/browser/ui/views/overlay/brave_video_overlay_window_views.h
 +++ b/browser/ui/views/overlay/brave_video_overlay_window_views.h
-@@ -6,12 +6,11 @@
+@@ -6,12 +6,12 @@
  #ifndef BRAVE_BROWSER_UI_VIEWS_OVERLAY_BRAVE_VIDEO_OVERLAY_WINDOW_VIEWS_H_
  #define BRAVE_BROWSER_UI_VIEWS_OVERLAY_BRAVE_VIDEO_OVERLAY_WINDOW_VIEWS_H_
  
@@ -373,6 +405,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.h b/brows
 -#include "base/timer/timer.h"
 +#include <optional>
 +
++#include "base/memory/raw_ptr.h"
  #include "build/build_config.h"
  #include "chrome/browser/ui/views/overlay/video_overlay_window_views.h"
 -#include "services/media_session/public/cpp/media_position.h"
@@ -381,12 +414,18 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.h b/brows
  
  // This view is a overlay window over PIP window to show controls on top of the
  // PIP window. We're restyling upstream's controls and adding some
-@@ -31,11 +30,18 @@
+@@ -31,11 +31,25 @@
    void SetUpViews() override;
    void OnUpdateControlsBounds() override;
    void OnKeyEvent(ui::KeyEvent* event) override;
 +  void SetMediaPosition(const media_session::MediaPosition& position) override;
++  void UpdateNaturalSize(const gfx::Size& natural_size) override;
++  bool ControlsHitTestContainsPoint(const gfx::Point& point) override;
 +  gfx::Size GetMinimumSize() const override;
++
++  SimpleOverlayWindowImageButton* expand_button_for_testing() {
++    return expand_button_;
++  }
  
   private:
    void UpdateControlIcons();
@@ -397,6 +436,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.h b/brows
 +  void ToggleExpanded();
 +
 +  std::optional<gfx::Rect> bounds_before_expanding_;
++  raw_ptr<SimpleOverlayWindowImageButton> expand_button_ = nullptr;
  };
  
  #endif  // BRAVE_BROWSER_UI_VIEWS_OVERLAY_BRAVE_VIDEO_OVERLAY_WINDOW_VIEWS_H_
@@ -404,7 +444,7 @@ diff --git a/browser/ui/views/overlay/firefox_pip_unittest.cc b/browser/ui/views
 new file mode 100644
 --- /dev/null
 +++ b/browser/ui/views/overlay/firefox_pip_unittest.cc
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,272 @@
 +// Copyright 2020 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -419,6 +459,7 @@ new file mode 100644
 +#include "base/memory/raw_ptr.h"
 +#include "base/test/scoped_feature_list.h"
 +#include "base/time/time.h"
++#include "brave/browser/ui/views/overlay/brave_video_overlay_window_views.h"
 +#include "chrome/browser/picture_in_picture/auto_pip_setting_overlay_view.h"
 +#include "chrome/browser/ui/views/chrome_layout_provider.h"
 +#include "chrome/browser/ui/views/overlay/playback_image_button.h"
@@ -442,6 +483,7 @@ new file mode 100644
 +#include "ui/events/keycodes/keyboard_codes.h"
 +#include "ui/views/controls/label.h"
 +#include "ui/views/focus/focus_manager.h"
++#include "ui/views/test/button_test_api.h"
 +#include "url/origin.h"
 +
 +namespace {
@@ -508,8 +550,9 @@ new file mode 100644
 +class FirefoxPipTest : public ChromeViewsTestBase {
 + public:
 +  void SetUp() override {
-+    features_.InitWithFeatures({media::kPictureInPictureOcclusionTracking},
-+                               {media::kPictureInPictureMuteControl});
++    features_.InitWithFeatures({media::kPictureInPictureOcclusionTracking,
++                                media::kPictureInPictureMuteControl},
++                               {});
 +    display::Screen::SetScreenInstance(&screen_);
 +    ViewsTestBase::SetUp();
 +    test_views_delegate()->set_layout_provider(
@@ -551,6 +594,10 @@ new file mode 100644
 +  void Position(int position, int duration) {
 +    window_->SetMediaPosition(media_session::MediaPosition(
 +        0, base::Seconds(duration), base::Seconds(position), false));
++  }
++  SimpleOverlayWindowImageButton* expand_button() {
++    return static_cast<BraveVideoOverlayWindowViews*>(window_.get())
++        ->expand_button_for_testing();
 +  }
 +
 +  std::unique_ptr<PipTestController> controller_;
@@ -608,10 +655,13 @@ new file mode 100644
 +  EXPECT_TRUE(controller_->seeks.empty());
 +}
 +
-+TEST_F(FirefoxPipTest, MuteWorksWhenUpstreamButtonFeatureIsDisabled) {
++TEST_F(FirefoxPipTest, MuteAndPlaybackIgnoreKeyRepeat) {
 +  ASSERT_NE(window_->toggle_mute_button_for_testing(), nullptr);
 +  Key(ui::VKEY_M);
 +  EXPECT_TRUE(controller_->muted);
++  window_->SetMediaMuted(controller_->muted);
++  EXPECT_TRUE(
++      window_->toggle_mute_button_for_testing()->is_muted_for_testing());
 +  Key(ui::VKEY_M, ui::EF_IS_REPEAT);
 +  EXPECT_TRUE(controller_->muted);
 +  Key(ui::VKEY_M);
@@ -641,6 +691,8 @@ new file mode 100644
 +        window_->GetToggleMuteButtonBounds()));
 +    EXPECT_FALSE(window_->timestamp_for_testing()->bounds().Intersects(
 +        window_->GetLiveCaptionButtonBounds()));
++    EXPECT_FALSE(expand_button()->bounds().Intersects(
++        window_->GetLiveCaptionButtonBounds()));
 +  }
 +}
 +
@@ -648,7 +700,19 @@ new file mode 100644
 +  const auto original = window_->GetWindowBoundsInScreen();
 +  Key(ui::VKEY_F);
 +  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
++  window_->UpdateNaturalSize({640, 480});
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
 +  Key(ui::VKEY_ESCAPE);
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), original);
++}
++
++TEST_F(FirefoxPipTest, ExpandButtonAcceptsClicksAndRestoresBounds) {
++  const auto original = window_->GetWindowBoundsInScreen();
++  ASSERT_TRUE(window_->ControlsHitTestContainsPoint(
++      expand_button()->GetMirroredBounds().CenterPoint()));
++  views::test::ButtonTestApi(expand_button()).NotifyDefaultMouseClick();
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
++  views::test::ButtonTestApi(expand_button()).NotifyDefaultMouseClick();
 +  EXPECT_EQ(window_->GetWindowBoundsInScreen(), original);
 +}
 +
