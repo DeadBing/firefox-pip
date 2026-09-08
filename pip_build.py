@@ -262,8 +262,8 @@ class Project:
         ], cwd=out, label="browser")
 
     def test(self, config):
-        self.build(config, target="brave_unit_tests")
-        executable = self.output_dir(config) / ("brave_unit_tests.exe" if self.target_os == "win" else "brave_unit_tests")
+        self.build(config, target="firefox_pip_tests")
+        executable = self.output_dir(config) / ("firefox_pip_tests.exe" if self.target_os == "win" else "firefox_pip_tests")
         self.run([executable, "--gtest_filter=FirefoxPipTest.*",
                   "--test-launcher-jobs=1", "--test-launcher-bot-mode"],
                  cwd=self.output_dir(config), label="pip-tests")
@@ -277,7 +277,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=6)
     parser.add_argument("--config", choices=["Component", "Static", "Debug"], default=None)
     parser.add_argument("--baseline", action="store_true")
-    parser.add_argument("--target", help="Optional native build target, e.g. brave_unit_tests")
+    parser.add_argument("--target", help="Optional native build target, e.g. firefox_pip_tests")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")

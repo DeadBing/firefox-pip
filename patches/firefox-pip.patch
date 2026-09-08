@@ -74,7 +74,7 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
  }
  
  void BraveVideoOverlayWindowViews::UpdateControlIcons() {
-@@ -113,106 +133,239 @@
+@@ -113,106 +133,244 @@
  }
  
  void BraveVideoOverlayWindowViews::LayoutTopControls() {
@@ -261,6 +261,9 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +
 +void BraveVideoOverlayWindowViews::ToggleExpanded() {
 +  const gfx::Rect work_area = GetWorkAreaForWindow();
++  if (work_area.IsEmpty()) {
++    return;
++  }
 +  if (bounds_before_expanding_) {
 +    gfx::Rect restored = *bounds_before_expanding_;
 +    bounds_before_expanding_.reset();
@@ -387,8 +390,10 @@ diff --git a/browser/ui/views/overlay/brave_video_overlay_window_views.cc b/brow
 +  VideoOverlayWindowViews::UpdateNaturalSize(natural_size);
 +  if (bounds_before_expanding_) {
 +    const auto work_area = GetWorkAreaForWindow();
-+    SetAspectRatio(gfx::SizeF(work_area.size()));
-+    SetBounds(work_area);
++    if (!work_area.IsEmpty()) {
++      SetAspectRatio(gfx::SizeF(work_area.size()));
++      SetBounds(work_area);
++    }
 +  }
 +}
 +
@@ -723,24 +728,65 @@ new file mode 100644
 diff --git a/test/BUILD.gn b/test/BUILD.gn
 --- a/test/BUILD.gn
 +++ b/test/BUILD.gn
-@@ -329,6 +329,22 @@
+@@ -102,6 +102,52 @@
+ 
+   if (is_win) {
+     deps += [ "//chrome/install_static/test:test_support" ]
++  }
++}
++
++if (!is_android) {
++  source_set("firefox_pip_test_cases") {
++    testonly = true
++    sources = [ "//brave/browser/ui/views/overlay/firefox_pip_unittest.cc" ]
++    deps = [
++      "//base",
++      "//base/test:test_support",
++      "//brave/browser/ui",
++      "//chrome/browser/ui/views",
++      "//chrome/browser/ui/views:layout_provider",
++      "//chrome/test:test_support",
++      "//chrome/test/views",
++      "//components/global_media_controls",
++      "//components/soda:test_support",
++      "//content/public/browser",
++      "//content/test:test_support",
++      "//media",
++      "//services/media_session/public/cpp",
++      "//skia",
++      "//testing/gtest",
++      "//ui/display:test_support",
++      "//ui/events",
++      "//ui/views:test_support",
++      "//url",
++    ]
++  }
++
++  test("firefox_pip_tests") {
++    configs += [
++      "//build/config:precompiled_headers",
++      "//chrome/test:disable_thinlto_cache_flags",
++    ]
++    deps = [
++      ":brave_test_support_unit",
++      ":firefox_pip_test_cases",
++      "//brave:browser_dependencies",
++      "//brave/browser",
++      "//brave/common",
++      "//brave/renderer",
++      "//brave/utility",
++      "//chrome:dependencies",
++      "//chrome/browser/ui/views",
++    ]
+   }
+ }
+ 
+@@ -329,6 +375,10 @@
      "//brave/components/brave_stats/browser",
    ]
  
 +  if (!is_android) {
-+    sources += [ "//brave/browser/ui/views/overlay/firefox_pip_unittest.cc" ]
-+    deps += [
-+      "//base/test:test_support",
-+      "//chrome/browser/ui/views:layout_provider",
-+      "//chrome/test/views",
-+      "//components/global_media_controls",
-+      "//components/soda:test_support",
-+      "//media",
-+      "//services/media_session/public/cpp",
-+      "//ui/display:test_support",
-+      "//ui/events",
-+      "//ui/views:test_support",
-+    ]
++    deps += [ ":firefox_pip_test_cases" ]
 +  }
 +
    if (is_brave_origin_branded) {
