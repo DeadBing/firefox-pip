@@ -452,7 +452,7 @@ diff --git a/browser/ui/views/overlay/firefox_pip_unittest.cc b/browser/ui/views
 new file mode 100644
 --- /dev/null
 +++ b/browser/ui/views/overlay/firefox_pip_unittest.cc
-@@ -0,0 +1,272 @@
+@@ -0,0 +1,274 @@
 +// Copyright 2020 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -571,7 +571,7 @@ new file mode 100644
 +    controller_ = std::make_unique<PipTestController>(
 +        contents_factory_.CreateWebContents(&profile_));
 +    auto display = screen_.GetPrimaryDisplay();
-+    display.set_work_area({0, 0, 1280, 800});
++    display.set_work_area(work_area_);
 +    screen_.display_list().UpdateDisplay(display);
 +    window_ = VideoOverlayWindowViews::Create(controller_.get());
 +    window_->set_overlay_view_cb_for_testing(base::BindRepeating(
@@ -608,6 +608,8 @@ new file mode 100644
 +        ->expand_button_for_testing();
 +  }
 +
++  // Leave room for the native menu bar when running with a fake Screen.
++  const gfx::Rect work_area_{40, 60, 640, 480};
 +  std::unique_ptr<PipTestController> controller_;
 +  std::unique_ptr<VideoOverlayWindowViews> window_;
 +
@@ -707,9 +709,9 @@ new file mode 100644
 +TEST_F(FirefoxPipTest, ExpandAndEscapeRestoreBounds) {
 +  const auto original = window_->GetWindowBoundsInScreen();
 +  Key(ui::VKEY_F);
-+  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
-+  window_->UpdateNaturalSize({640, 480});
-+  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), work_area_);
++  window_->UpdateNaturalSize({480, 640});
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), work_area_);
 +  Key(ui::VKEY_ESCAPE);
 +  EXPECT_EQ(window_->GetWindowBoundsInScreen(), original);
 +}
@@ -719,7 +721,7 @@ new file mode 100644
 +  ASSERT_TRUE(window_->ControlsHitTestContainsPoint(
 +      expand_button()->GetMirroredBounds().CenterPoint()));
 +  views::test::ButtonTestApi(expand_button()).NotifyDefaultMouseClick();
-+  EXPECT_EQ(window_->GetWindowBoundsInScreen(), gfx::Rect(0, 0, 1280, 800));
++  EXPECT_EQ(window_->GetWindowBoundsInScreen(), work_area_);
 +  views::test::ButtonTestApi(expand_button()).NotifyDefaultMouseClick();
 +  EXPECT_EQ(window_->GetWindowBoundsInScreen(), original);
 +}
@@ -728,7 +730,7 @@ new file mode 100644
 diff --git a/test/BUILD.gn b/test/BUILD.gn
 --- a/test/BUILD.gn
 +++ b/test/BUILD.gn
-@@ -102,6 +102,52 @@
+@@ -102,6 +102,53 @@
  
    if (is_win) {
      deps += [ "//chrome/install_static/test:test_support" ]
@@ -742,9 +744,10 @@ diff --git a/test/BUILD.gn b/test/BUILD.gn
 +    deps = [
 +      "//base",
 +      "//base/test:test_support",
-+      "//brave/browser/ui",
++      "//chrome/browser/ui",
 +      "//chrome/browser/ui/views",
 +      "//chrome/browser/ui/views:layout_provider",
++      "//chrome/browser/ui/views/overlay",
 +      "//chrome/test:test_support",
 +      "//chrome/test/views",
 +      "//components/global_media_controls",
@@ -781,7 +784,7 @@ diff --git a/test/BUILD.gn b/test/BUILD.gn
    }
  }
  
-@@ -329,6 +375,10 @@
+@@ -329,6 +376,10 @@
      "//brave/components/brave_stats/browser",
    ]
  
